@@ -32,7 +32,7 @@ Installation
 
 ::
 
-    pip install pydiscourse
+    pip install fool-pydiscourse
 
 Examples
 ========
