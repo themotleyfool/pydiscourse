@@ -1,0 +1,52 @@
+name: Build & Test
+
+on: [ push ]
+
+env:
+  # we're using an alias here so we can reference it in individual tasks.
+  # making it global breaks the Publish command for some reason.
+  PIP_INDEX_URL_VALUE: https://${{secrets.PRIVATE_PYPI_USERNAME}}:${{secrets.PRIVATE_PYPI_PASSWORD}}@nexus.fool.com/repository/fool-pypi/simple/
+
+jobs:
+  test:
+    name: Test on Python ${{ matrix.python-version }} 🔎
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.7", "3.8", "3.9", "3.10" ]
+
+    steps:
+      - uses: actions/checkout@v1
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+      - name: Run Unit Tests
+        run: python setup.py test
+
+  publish:
+    name: Publish to Nexus ⏫
+    # only run on tag builds
+    if: startsWith(github.ref, 'refs/tags')
+    runs-on: ubuntu-latest
+    needs: [test]
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Python 🐍 dependencies
+        run: python -m pip install -U pip && python -m pip install -U setuptools twine wheel
+      - name: Build 🔨 dist packages
+        env:
+          PIP_INDEX_URL: ${{ env.PIP_INDEX_URL_VALUE }}
+        run: python setup.py sdist bdist_wheel --verbose
+      - name: Publish 📦
+        run: python -m twine upload dist/* --verbose
+        env:
+          TWINE_USERNAME: ${{ secrets.PRIVATE_PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PRIVATE_PYPI_PASSWORD }}
+          TWINE_REPOSITORY_URL: ${{ secrets.PYPI_REPOSITORY_URL }}
